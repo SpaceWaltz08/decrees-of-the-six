@@ -20,6 +20,12 @@ public class CouncilConfigData {
     public boolean opsOnly = false;
 
     /**
+     * Display name of the council, used in chat prefixes like [The Hexarchate].
+     * Maps to: "councilName" in council.json
+     */
+    public String councilName = "";
+
+    /**
      * List of council seats as defined in council.json → "seats": [ ... ]
      */
     public List<SeatDefinition> seats = new ArrayList<>();

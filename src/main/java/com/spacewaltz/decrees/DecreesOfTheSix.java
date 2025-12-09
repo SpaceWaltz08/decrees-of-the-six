@@ -16,6 +16,9 @@ import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 public class DecreesOfTheSix implements ModInitializer {
     public static final String MOD_ID = "decrees_of_the_six";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
@@ -24,8 +27,8 @@ public class DecreesOfTheSix implements ModInitializer {
     public void onInitialize() {
         LOGGER.info("Initializing Decrees of the Six...");
 
-        // NEW: core toggles + voting rules
-        DecreesConfig.load();      // decrees_config.json (enabled / opsOnly)
+        // Core toggles + voting rules
+        DecreesConfig.load();      // decrees_config.json (enabled / opsOnly) – if you still use it
         CouncilConfig.load();      // council.json
         VotingRulesConfig.load();  // voting_rules.json
 
@@ -37,7 +40,7 @@ public class DecreesOfTheSix implements ModInitializer {
                 CouncilCommands.register(dispatcher)
         );
 
-        // Council-member join reminder (B.3)
+        // Council-member join reminder with per-seat pending list
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             ServerPlayerEntity player = handler.getPlayer();
 
@@ -47,25 +50,53 @@ public class DecreesOfTheSix implements ModInitializer {
                 return;
             }
 
-            // Count decrees in VOTING where this seat hasn't voted yet
-            int pending = 0;
-            for (Decree d : DecreeStore.get().decrees) {
-                if (d.status == DecreeStatus.VOTING && !d.votes.containsKey(seat.id)) {
-                    pending++;
-                }
+            // Find decrees in VOTING where this seat hasn't voted yet
+            List<Decree> pending = DecreeStore.get().decrees.stream()
+                    .filter(d -> d.status == DecreeStatus.VOTING)
+                    .filter(d -> !d.votes.containsKey(seat.id))
+                    .toList();
+
+            if (pending.isEmpty()) {
+                return;
             }
 
-            if (pending > 0) {
-                String plural = (pending == 1) ? "" : "s";
-                player.sendMessage(
-                        Text.literal("§6[Decrees] §e" + seat.displayName +
-                                "§6, you have §e" + pending + "§6 decree" + plural +
-                                " awaiting your vote. Use §e/decrees decree list active§6."),
-                        false
-                );
+            int count = pending.size();
+            String plural = (count == 1) ? "" : "s";
+
+            // Show up to 5 decree IDs to avoid spam
+            String idList = pending.stream()
+                    .limit(5)
+                    .map(d -> "#" + d.id)
+                    .collect(Collectors.joining(", "));
+            if (count > 5) {
+                idList += ", …";
             }
+
+            String prefix = getPrefix();
+
+            player.sendMessage(
+                    Text.literal(
+                            prefix + " §e" + seat.displayName +
+                                    "§6, you have §e" + count + "§6 decree" + plural +
+                                    " awaiting your vote: §e" + idList +
+                                    "§6. Use §e/decrees decree list active§6 for details."
+                    ),
+                    false
+            );
         });
 
         LOGGER.info("Decrees of the Six initialized.");
+    }
+
+    /**
+     * Shared prefix using the configured council name if present.
+     * Falls back to [Decrees] if no name is set.
+     */
+    private static String getPrefix() {
+        String name = CouncilConfig.get().councilName;
+        if (name == null || name.isBlank()) {
+            return "§6[Decrees]";
+        }
+        return "§6[" + name + "]";
     }
 }

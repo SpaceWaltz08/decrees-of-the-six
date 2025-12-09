@@ -3,15 +3,21 @@
 A Fabric server-side governance & voting system designed for council-style roleplay servers.  
 The Hexarchate (or any council you define) can create, debate, and vote on decrees in-game, with automatic quorum/majority handling and a season history log.
 
+**Current version:** 0.1.1 (Minecraft 1.21.1, Fabric)
+
 ---
 
 ## Features
 
 - Council seats defined via JSON (`council.json`).
+- **Named councils** with a configurable `councilName` used in decree-related messages.
+- **Council ceremony** command to convene or re-convene the council with a server-wide broadcast and fireworks.
 - Decrees with lifecycle: **DRAFT → VOTING → ENACTED/REJECTED**.
 - Configurable voting rules (quorum, duration, majority mode, ties).
 - Global toggles: enable/disable the whole decree system or restrict it to ops.
 - Seat tools for assigning council members.
+- **Join reminder** for council members with pending votes.
+- **One-vote-remaining ping** when only one seat is left to vote on a decree.
 - Text log of final decrees for season history.
 - All interaction done in-game via `/decrees` commands.
 
@@ -47,12 +53,13 @@ This is a **server-side** mod. Clients do **not** need to install it.
 
 ### 1. `council.json`
 
-Defines global flags and council seats.
+Defines global flags, the council name, and council seats.
 
 Example:
 
 ~~~json
 {
+  "councilName": "Hexarchate of Salmon",
   "decreesEnabled": true,
   "opsOnly": false,
   "seats": [
@@ -65,6 +72,11 @@ Example:
 ~~~
 
 **Fields:**
+
+- `councilName` (string, optional)  
+  - Friendly display name of your council (e.g. `"Hexarchate of Salmon"`).  
+  - Used in decree-related messages and flavour text.  
+  - Can be set manually or via `/decrees council create <name>`.
 
 - `decreesEnabled` (boolean)  
   - `true` → all decree features work normally.  
@@ -80,6 +92,11 @@ Example:
   - `holderUuid` (optional) – UUID of the player currently holding that seat.
 
 You typically assign seat holders in-game using `/decrees seat set` instead of editing `holderUuid` by hand.
+
+> **Note:** `/decrees council create <name>` will:
+> - Set `councilName` to `<name>`,
+> - Force `decreesEnabled = true`,
+> - Force `opsOnly = false`.
 
 ---
 
@@ -150,6 +167,7 @@ Seats are used to:
 1. Determine who may create/open/delete decrees.
 2. Determine who may vote (each seat = one vote).
 3. Show “your vote” in `/decrees decree list active`.
+4. Drive join reminders and “one vote left” pings.
 
 ### Managing Seats (Ops Only)
 
@@ -224,6 +242,32 @@ Typical flow for a council session:
 
 ---
 
+## Council Ceremony & Reminders
+
+### Council Ceremony
+
+- `/decrees council create <name>` (op only)  
+
+This command:
+
+- Sets the council name (`councilName`) to `<name>`.
+- Enables the decree system (`decreesEnabled = true`).
+- Switches back to council mode (`opsOnly = false`).
+- Broadcasts a global message announcing that the council has convened or re-convened.
+- Launches multiple fireworks at the executor’s position.
+
+Use this once per season when the council is founded, or again if you want to ceremonially “re-convene” it after changes.
+
+### Join Reminder & One-Vote-Remaining Ping
+
+- When a **council member** joins, they get a reminder if they have pending votes:  
+  - Shows how many decrees in **VOTING** still lack their vote.  
+  - Lists up to 5 decree IDs (e.g. `#3, #7, #12...`).
+
+- When **only one active seat** is left to vote on a decree, the server broadcasts a message indicating which seat is still pending.
+
+---
+
 ## Commands Overview
 
 ### 1. Root
@@ -236,7 +280,14 @@ Typical flow for a council session:
 
 ---
 
-### 2. Seats (Ops Only)
+### 2. Council Ceremony
+
+- `/decrees council create <name>` (op only)  
+  Convene or re-convene the council, set the council name, enable decrees, and trigger the ceremony broadcast + fireworks.
+
+---
+
+### 3. Seats (Ops Only)
 
 - `/decrees seat list`  
 - `/decrees seat set <seat_id> <player>`  
@@ -244,7 +295,7 @@ Typical flow for a council session:
 
 ---
 
-### 3. Decree Management
+### 4. Decree Management
 
 - `/decrees decree list`  
   List all decrees.
@@ -281,7 +332,7 @@ Typical flow for a council session:
 
 ---
 
-### 4. Voting
+### 5. Voting
 
 - `/decrees vote <id> yes|no|abstain`  
   Cast your seat’s vote on a decree currently in **VOTING**.
@@ -294,6 +345,7 @@ Typical flow for a council session:
 
 - Always allowed to use:
   - `/decrees reload`
+  - `/decrees council create <name>`
   - `/decrees seat ...`
   - `/decrees decree force ...`
 - When `opsOnly = true`, ops can also create/open/delete/vote on decrees even without a seat.

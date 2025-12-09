@@ -6,8 +6,10 @@ plugins {
 version = project.mod_version
 group = project.maven_group
 
+// Jar base name will now include the Minecraft version, e.g.
+// decrees-of-the-six-1.21.1-0.1.0.jar
 base {
-	archivesName = project.archives_base_name
+	archivesName = "${project.archives_base_name}-${project.minecraft_version}"
 }
 
 repositories {
@@ -84,7 +86,6 @@ jar {
     from("README.md")
     from("CHANGELOG.md")
 }
-
 
 // configure the maven publication
 publishing {

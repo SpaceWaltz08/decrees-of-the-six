@@ -6,6 +6,18 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] – Council Awakens
+
+- Added `/decrees council create <name>` to ceremonially convene the council:
+  - Enables the decrees system and switches to council mode.
+  - Broadcasts a global message with the chosen council name.
+  - Launches fireworks at the executor’s position.
+- Added council name support in prefixes (e.g. `[Hexarchate • Decrees]` instead of plain `[Decrees]`).
+- Improved join reminder:
+  - Now shows per-seat pending decrees and up to 5 decree IDs.
+- Minor code cleanup and internal polish.
+
+
 ## [0.1.0] - 2025-12-09
 
 ### Added
