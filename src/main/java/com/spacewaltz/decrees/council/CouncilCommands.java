@@ -19,11 +19,13 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.ClickEvent;
+import net.minecraft.text.HoverEvent;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.entity.projectile.FireworkRocketEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.sound.SoundEvents;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -241,8 +243,13 @@ public class CouncilCommands {
                         // /decrees decree list my
                         .then(CommandManager.literal("my")
                                 .executes(ctx -> listMyDecrees(ctx.getSource()))
+                                .then(CommandManager.argument("page", IntegerArgumentType.integer(1))
+                                        .executes(ctx -> listMyDecrees(
+                                                ctx.getSource(),
+                                                IntegerArgumentType.getInteger(ctx, "page")
+                                        ))
+                                )
                         )
-                        // /decrees decree list active [page]
                         .then(CommandManager.literal("active")
                                 .executes(ctx -> listActiveDecrees(ctx.getSource(), 1))
                                 .then(CommandManager.argument("page", IntegerArgumentType.integer(1))
@@ -250,6 +257,23 @@ public class CouncilCommands {
                                                 ctx.getSource(),
                                                 IntegerArgumentType.getInteger(ctx, "page")
                                         ))
+                                )
+                        )
+                        .then(CommandManager.literal("status")
+                                .then(CommandManager.argument("status", StringArgumentType.word())
+                                        .suggests(CouncilCommands::suggestStatuses)
+                                        .executes(ctx -> listDecreesByStatus(
+                                                ctx.getSource(),
+                                                StringArgumentType.getString(ctx, "status"),
+                                                1
+                                        ))
+                                        .then(CommandManager.argument("page", IntegerArgumentType.integer(1))
+                                                .executes(ctx -> listDecreesByStatus(
+                                                        ctx.getSource(),
+                                                        StringArgumentType.getString(ctx, "status"),
+                                                        IntegerArgumentType.getInteger(ctx, "page")
+                                                ))
+                                        )
                                 )
                         )
                         // /decrees decree list category <category>
@@ -376,37 +400,35 @@ public class CouncilCommands {
 
     private static int showHelp(ServerCommandSource src) {
         Messenger.info(src, "§eCommand overview:");
-        Messenger.line(src, "§e/decrees help §7- Show this help.");
-        Messenger.line(src, "§e/decrees status [id] §7- Show voting status and which seats still haven't voted.");
-        Messenger.line(src, "§e/decrees history [page] §7- View the season history of completed decrees.");
-        Messenger.line(src, "§e/decrees council create <name> §7- Ceremonially convene the council and enable decrees (ops only).");
-        Messenger.line(src, "§e/decrees stats seats §7- Overview of decree stats per seat.");
-        Messenger.line(src, "§e/decrees stats me §7- Stats for your own seat.");
-        Messenger.line(src, "§e/decrees stats seat <seat_id> §7- Stats for a specific seat.");
-        Messenger.line(src, "§e/decrees reload §7- Reload council & voting configs (ops only).");
-        Messenger.line(src, "§e/decrees config decreesEnabled on|off §7- Enable/disable decrees (ops only).");
-        Messenger.line(src, "§e/decrees config opsOnly on|off §7- Toggle ops-only mode (ops only).");
-        Messenger.line(src, "§e/decrees config show §7- Show system status and active decrees.");
+        // Core
+        Messenger.line(src, "§e/decrees help §7– Show this help.");
+        Messenger.line(src, "§e/decrees reload §7– Reload council/decree config from disk (admin).");
 
-        Messenger.line(src, "§e/decrees seat list §7- List all council seats (ops only).");
-        Messenger.line(src, "§e/decrees seat set <seat_id> <player> §7- Assign a player to a seat (ops only).");
-        Messenger.line(src, "§e/decrees seat clear <seat_id> §7- Clear the holder of a seat (ops only).");
+        // Council
+        Messenger.line(src, "§e/decrees council create <name> §7– Create or replace the council and run the ceremony.");
+        Messenger.line(src, "§e/decrees council reconvene §7– Run the council ceremony again without changing seats.");
 
-        Messenger.line(src, "§e/decrees decree create <title> §7- Create a new decree (council only).");
-        Messenger.line(src, "§e/decrees decree list [page] §7- List decrees with pagination.");
-        Messenger.line(src, "§e/decrees decree list my §7- List decrees created by your seat.");
-        Messenger.line(src, "§e/decrees decree list active [page] §7- Show decrees currently in VOTING.");
-        Messenger.line(src, "§e/decrees decree list category <category> §7- List decrees by category.");
-        Messenger.line(src, "§e/decrees decree info <id> §7- Show full info for a decree.");
-        Messenger.line(src, "§e/decrees decree results <id> §7- Show detailed vote results.");
-        Messenger.line(src, "§e/decrees decree open <id> §7- Open a decree for voting (council only).");
-        Messenger.line(src, "§e/decrees decree force <id> enacted|rejected|cancelled §7- Force final status (ops only).");
-        Messenger.line(src, "§e/decrees decree edit title|description|category|expiry ... §7- Edit decree fields.");
-        Messenger.line(src, "§e/decrees decree delete <id> [confirm] §7- Delete a §eDRAFT§7 decree with 2-step confirmation (council only).");
+        // Seats
+        Messenger.line(src, "§e/decrees seat list §7– List all council seats and their current holders.");
+        Messenger.line(src, "§e/decrees seat set <seatId> <player> §7– Assign a player to a council seat.");
+        Messenger.line(src, "§e/decrees seat clear <seatId> §7– Clear the holder of a council seat.");
 
-        Messenger.line(src, "§e/decrees vote <id> yes|no|abstain §7- Cast your seat's vote.");
+        // Decrees – creation & voting
+        Messenger.line(src, "§e/decrees decree create <title> §7– Create a new decree in §edraft§7 state.");
+        Messenger.line(src, "§e/decrees decree open <id> §7– Open a decree for voting (council-only).");
+        Messenger.line(src, "§e/decrees decree cancel <id> §7– Cancel a decree still in draft or voting.");
+        Messenger.line(src, "§e/decrees decree vote <id> <yes|no|abstain> §7– Cast your vote as a council member.");
+        Messenger.line(src, "§8(When a decree opens, council members also get clickable [Yes]/[No]/[Abstain] buttons.)");
+
+        // Decrees – listing & history
+        Messenger.line(src, "§e/decrees decree list [page] §7– List decrees by ID with status and vote counts.");
+        Messenger.line(src, "§e/decrees decree list active [page] §7– List only decrees currently in §evoting§7.");
+        Messenger.line(src, "§e/decrees decree list my [page] §7– List decrees created by your council seat.");
+        Messenger.line(src, "§e/decrees decree list status <draft|voting|enacted|rejected|cancelled> [page] §7– Filter by status.");
+        Messenger.line(src, "§e/decrees decree history [page] §7– View the finalized decree history log.");
 
         Messenger.line(src, "§8Note: Some commands require you to hold a council seat or be an operator.");
+
         return 1;
     }
 
@@ -436,6 +458,12 @@ public class CouncilCommands {
                 .distinct()
                 .toList();
         return CommandSource.suggestMatching(cats, builder);
+    }
+
+    private static CompletableFuture<Suggestions> suggestStatuses(CommandContext<ServerCommandSource> context,
+                                                                  SuggestionsBuilder builder) {
+        String[] values = new String[] { "draft", "voting", "enacted", "rejected", "cancelled" };
+        return CommandSource.suggestMatching(values, builder);
     }
 
     // -------- SEAT METHODS --------
@@ -662,6 +690,11 @@ public class CouncilCommands {
     }
 
     private static int listMyDecrees(ServerCommandSource src) {
+        // Default to first page
+        return listMyDecrees(src, 1);
+    }
+
+    private static int listMyDecrees(ServerCommandSource src, int page) {
         if (!(src.getEntity() instanceof ServerPlayerEntity player)) {
             Messenger.error(src, "Only players can list their own decrees.");
             return 0;
@@ -674,31 +707,124 @@ public class CouncilCommands {
         }
 
         var data = DecreeStore.get();
-        boolean any = false;
-
-        Messenger.info(src, "§6Decrees created by §e" + seat.displayName + "§6:");
+        List<Decree> mine = new ArrayList<>();
         for (Decree d : data.decrees) {
             if (seat.id.equals(d.createdBySeatId)) {
-                any = true;
-
-                int yes = 0;
-                int no = 0;
-                int abstain = 0;
-                for (VoteChoice v : d.votes.values()) {
-                    if (v == VoteChoice.YES) yes++;
-                    else if (v == VoteChoice.NO) no++;
-                    else if (v == VoteChoice.ABSTAIN) abstain++;
-                }
-
-                String statusColored = Messenger.colorStatus(d.status);
-                String line = " §e#" + d.id + " " + statusColored + "§r " + d.title +
-                        " §8(Yes " + yes + ", No " + no + ", Abstain " + abstain + ")";
-                Messenger.line(src, line);
+                mine.add(d);
             }
         }
 
-        if (!any) {
+        if (mine.isEmpty()) {
             Messenger.info(src, "§7Your seat has not created any decrees yet.");
+            return 1;
+        }
+
+        int total = mine.size();
+        int totalPages = (int) Math.ceil(total / (double) DECREES_PER_PAGE);
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+
+        int startIndex = (page - 1) * DECREES_PER_PAGE;
+        int endIndex = Math.min(startIndex + DECREES_PER_PAGE, total);
+
+        Messenger.info(src, "§6Decrees created by §e" + seat.displayName + "§6 §7(page " + page + "/" + totalPages + "):");
+
+        for (int i = startIndex; i < endIndex; i++) {
+            Decree d = mine.get(i);
+
+            int yes = 0;
+            int no = 0;
+            int abstain = 0;
+            for (VoteChoice v : d.votes.values()) {
+                if (v == VoteChoice.YES) yes++;
+                else if (v == VoteChoice.NO) no++;
+                else if (v == VoteChoice.ABSTAIN) abstain++;
+            }
+
+            String statusColored = Messenger.colorStatus(d.status);
+            String line = " §e#" + d.id + " " + statusColored + "§r " + d.title +
+                    " §8(Yes " + yes + ", No " + no + ", Abstain " + abstain + ")";
+            Messenger.line(src, line);
+        }
+
+        if (totalPages > 1) {
+            if (page < totalPages) {
+                Messenger.line(src, "§7Use §e/decrees decree list my " + (page + 1) + "§7 for the next page.");
+            } else {
+                Messenger.line(src, "§7You are on the last page for your decrees.");
+            }
+        }
+
+        return 1;
+    }
+
+    private static int listDecreesByStatus(ServerCommandSource src, String statusName, int page) {
+        DecreeStatus status;
+        String normalized = statusName.toLowerCase(java.util.Locale.ROOT);
+        switch (normalized) {
+            case "draft"    -> status = DecreeStatus.DRAFT;
+            case "voting"   -> status = DecreeStatus.VOTING;
+            case "enacted"  -> status = DecreeStatus.ENACTED;
+            case "rejected" -> status = DecreeStatus.REJECTED;
+            case "cancelled", "canceled" -> status = DecreeStatus.CANCELLED;
+            default -> {
+                Messenger.error(src, "Unknown status: " + statusName + ". Use draft, voting, enacted, rejected, or cancelled.");
+                return 0;
+            }
+        }
+
+        var data = DecreeStore.get();
+        var filtered = data.decrees.stream()
+                .filter(d -> d.status == status)
+                .toList();
+
+        if (filtered.isEmpty()) {
+            Messenger.info(src, "§7No decrees found with status " + Messenger.colorStatus(status) + "§7.");
+            return 1;
+        }
+
+        int total = filtered.size();
+        int totalPages = (int) Math.ceil(total / (double) DECREES_PER_PAGE);
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+
+        int startIndex = (page - 1) * DECREES_PER_PAGE;
+        int endIndex = Math.min(startIndex + DECREES_PER_PAGE, total);
+
+        Messenger.info(src, "§6Decrees with status " + Messenger.colorStatus(status) + "§6 §7(page " + page + "/" + totalPages + "):");
+
+        for (int i = startIndex; i < endIndex; i++) {
+            Decree d = filtered.get(i);
+
+            int yes = 0;
+            int no = 0;
+            int abstain = 0;
+            for (VoteChoice v : d.votes.values()) {
+                if (v == VoteChoice.YES) yes++;
+                else if (v == VoteChoice.NO) no++;
+                else if (v == VoteChoice.ABSTAIN) abstain++;
+            }
+
+            StringBuilder line = new StringBuilder();
+            line.append(" §e[#").append(d.id).append("] ")
+                    .append(Messenger.colorStatus(d.status)).append("§r ")
+                    .append(d.title);
+
+            if (!d.votes.isEmpty()) {
+                line.append(" §7– Y:").append(yes)
+                        .append(" N:").append(no)
+                        .append(" A:").append(abstain);
+            }
+
+            Messenger.line(src, line.toString());
+        }
+
+        if (totalPages > 1) {
+            if (page < totalPages) {
+                Messenger.line(src, "§7Use §e/decrees decree list status " + normalized + " " + (page + 1) + "§7 for the next page.");
+            } else {
+                Messenger.line(src, "§7You are on the last page for this status.");
+            }
         }
 
         return 1;
@@ -1189,16 +1315,14 @@ public class CouncilCommands {
         var server = src.getServer();
         var pm = server.getPlayerManager();
 
-        // Big broadcast line
-        pm.broadcast(
-                Text.literal(getPrefix() + " §l" + councilName + "§r §6" + verb + "§6. " + subtitle),
-                false
+// Big broadcast line
+        Messenger.broadcastToCouncil(
+                server,
+                "§l" + councilName + "§r §6" + verb + "§6. " + subtitle
         );
 
-        // Play a simple celebration sound for every player
-        pm.getPlayerList().forEach(player -> {
-            player.playSound(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0F, 1.0F);
-        });
+// Play the ceremony sound for every player online
+        CouncilSounds.playCeremonySoundToAll(server);
 
         // Fireworks at the executor's location if it's a player
         if (src.getEntity() instanceof ServerPlayerEntity opPlayer) {
@@ -1390,10 +1514,41 @@ public class CouncilCommands {
                 Messenger.colorStatus(DecreeStatus.VOTING) +
                 "§6: §r" + d.title;
 
+        Text header = Text.literal(msg);
+        Text buttons = buildVoteButtonsText(d.id);
+
         for (ServerPlayerEntity p : pm.getPlayerList()) {
             if (CouncilUtil.getSeatFor(p) == null) continue;
-            p.sendMessage(Text.literal(msg), false);
+            p.sendMessage(header, false);
+            p.sendMessage(buttons, false);
         }
+    }
+
+    private static Text buildVoteButtonsText(int decreeId) {
+        MutableText base = Text.literal("§7Cast your vote: ");
+
+        Text yes = Text.literal("§a[Yes]").styled(style -> style
+                .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
+                        "/decrees vote " + decreeId + " yes"))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                        Text.literal("§aClick to vote YES on #" + decreeId)))
+        );
+
+        Text no = Text.literal(" §c[No]").styled(style -> style
+                .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
+                        "/decrees vote " + decreeId + " no"))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                        Text.literal("§cClick to vote NO on #" + decreeId)))
+        );
+
+        Text abstain = Text.literal(" §7[Abstain]").styled(style -> style
+                .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
+                        "/decrees vote " + decreeId + " abstain"))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                        Text.literal("§7Click to abstain on #" + decreeId)))
+        );
+
+        return base.append(yes).append(no).append(abstain);
     }
 
     private static void notifyCouncilDecreeFinal(ServerCommandSource src, Decree d) {
@@ -1502,16 +1657,14 @@ public class CouncilCommands {
                 "§7, Quorum §e" + rules.minQuorumPercent + "%§7, Duration §e" + durationText +
                 "§7, Ties " + (rules.tiesPass ? "§apass" : "§cfail"));
 
-        String broadcast = Messenger.prefix() +
-                " §eDecree #" + d.id + " (" + d.title + ") is now in " +
-                Messenger.colorStatus(DecreeStatus.VOTING) +
-                "§e. Cast your vote with §b/decrees vote " + d.id + " <yes/no/abstain>.";
-
-        src.getServer().getPlayerManager().broadcast(
-                Text.literal(broadcast),
-                false
+        // Broadcast a clean status line to everyone online
+        Messenger.broadcastToCouncil(
+                src.getServer(),
+                "§eDecree #" + d.id + " (" + d.title + ") is now in " +
+                        Messenger.colorStatus(DecreeStatus.VOTING) + "§e."
         );
 
+        // Send detailed + clickable vote hints directly to council members
         notifyCouncilVotingOpened(src, d);
 
         return 1;
@@ -1882,24 +2035,20 @@ public class CouncilCommands {
 
         // Finalisation broadcast
         if (before != after && after != DecreeStatus.VOTING) {
-            String broadcast = Messenger.prefix() +
-                    " §6Decree §e#" + d.id + "§6 (" + d.title + ") is now " +
-                    Messenger.colorStatus(after) + "§6.";
-            src.getServer().getPlayerManager().broadcast(
-                    Text.literal(broadcast),
-                    false
+            Messenger.broadcastToCouncil(
+                    src.getServer(),
+                    "§6Decree §e#" + d.id + "§6 (" + d.title + ") is now " +
+                            Messenger.colorStatus(after) + "§6."
             );
             notifyCouncilDecreeFinal(src, d);
         } else {
             // No finalisation yet → if only ONE vote remaining, ping the council.
             if (after == DecreeStatus.VOTING && missingSeats.size() == 1) {
                 SeatDefinition missing = missingSeats.get(0);
-                String broadcast = Messenger.prefix() +
-                        " §6Only one vote remaining on decree §e#" + d.id +
-                        "§6 (" + d.title + "). Awaiting: §e" + missing.displayName + "§6.";
-                src.getServer().getPlayerManager().broadcast(
-                        Text.literal(broadcast),
-                        false
+                Messenger.broadcastToCouncil(
+                        src.getServer(),
+                        "§6Only one vote remaining on decree §e#" + d.id +
+                                "§6 (" + d.title + "). Awaiting: §e" + missing.displayName + "§6."
                 );
             }
         }
@@ -2018,13 +2167,10 @@ public class CouncilCommands {
                 continue; // illegal/redundant transition, ignore
             }
 
-            String broadcast = Messenger.prefix() +
-                    " §6Decree §e#" + d.id + "§6 (" + d.title +
-                    ") is now " + Messenger.colorStatus(after) +
-                    "§6 (voting period expired).";
-            server.getPlayerManager().broadcast(
-                    Text.literal(broadcast),
-                    false
+            Messenger.broadcastToCouncil(
+                    server,
+                    "§6Decree §e#" + d.id + "§6 (" + d.title + ") is now " +
+                            Messenger.colorStatus(after) + "§6 (voting period expired)."
             );
 
             // Notify council members for final states

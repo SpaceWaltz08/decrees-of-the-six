@@ -167,6 +167,9 @@ public final class CouncilConfig {
         if (cfg.councilName == null || cfg.councilName.isBlank()) {
             cfg.councilName = "The Council";
         }
+        if (cfg.ceremonySound == null || cfg.ceremonySound.isBlank()) {
+            cfg.ceremonySound = "minecraft:ui.toast.challenge_complete";
+        }
 
         if (cfg.decreesEnabled && cfg.seats.isEmpty()) {
             DecreesOfTheSix.LOGGER.warn(

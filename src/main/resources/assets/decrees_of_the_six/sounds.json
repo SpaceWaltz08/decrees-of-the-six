@@ -1,0 +1,10 @@
+{
+  "council_chime": {
+    "sounds": [
+      {
+        "name": "decrees_of_the_six:council_chime",
+        "stream": false
+      }
+    ]
+  }
+}

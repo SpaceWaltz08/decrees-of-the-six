@@ -2,6 +2,7 @@ package com.spacewaltz.decrees.council;
 
 import com.spacewaltz.decrees.decree.DecreeStatus;
 import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.text.Text;
 
 /**
@@ -33,6 +34,24 @@ public final class Messenger {
      */
     public static void line(ServerCommandSource src, String msg) {
         src.sendMessage(Text.literal(msg));
+    }
+
+    /**
+     * Broadcast a council-prefixed message to everyone on the server.
+     */
+    public static void broadcastToCouncil(MinecraftServer server, String msg) {
+        if (server == null) return;
+        server.getPlayerManager().broadcast(
+                Text.literal(prefix() + " " + msg),
+                false
+        );
+    }
+
+    /**
+     * Convenience for secondary info lines (bullet style).
+     */
+    public static void decreeInfoLine(ServerCommandSource src, String msg) {
+        line(src, " §7• " + msg);
     }
 
     public static String colorStatus(DecreeStatus status) {

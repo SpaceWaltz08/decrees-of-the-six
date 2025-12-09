@@ -3,7 +3,7 @@
 A Fabric server-side governance & voting system designed for council-style roleplay servers.  
 The Hexarchate (or any council you define) can create, debate, and vote on decrees in-game, with automatic quorum/majority handling and a season history log.
 
-**Current version:** 0.1.2 (Minecraft 1.21.1, Fabric)
+**Current version:** 0.1.3 (Minecraft 1.21.1, Fabric)
 
 ---
 
@@ -11,7 +11,8 @@ The Hexarchate (or any council you define) can create, debate, and vote on decre
 
 - Council seats defined via JSON (`council.json`).
 - **Named councils** with a configurable `councilName` used in decree-related messages.
-- **Council ceremony** command to convene or re-convene the council with a server-wide broadcast and fireworks.
+- **Council ceremony** command to convene or re-convene the council with a server-wide broadcast, configurable chime, and fireworks.
+- **Configurable council ceremony sound** via `ceremonySound` in `council.json` (e.g. `decrees_of_the_six:council_chime`).
 - Decrees with lifecycle: **DRAFT → VOTING → ENACTED/REJECTED/CANCELLED**.
 - Configurable voting rules (quorum, duration, majority mode, ties).
 - Global toggles: enable/disable the whole decree system or restrict it to ops.
@@ -19,8 +20,11 @@ The Hexarchate (or any council you define) can create, debate, and vote on decre
 - **Join reminder** for council members with pending votes.
 - **One-vote-remaining ping** when only one seat is left to vote on a decree.
 - **Paginated decree lists & in-game history** via `/decrees decree list [page]` and `/decrees history [page]`.
+- **Status-filtered decree lists** via `/decrees decree list status <draft|voting|enacted|rejected|cancelled> [page]`.
+- **“My decrees” & active lists with pagination** via `/decrees decree list my [page]` and `/decrees decree list active [page]`.
 - **Seat statistics & status helpers** via `/decrees stats ...` and `/decrees status [id]`.
 - **Clean chat formatting & tab completion** for decree IDs, seat IDs, and categories.
+- **Clickable vote hints** (buttons `[Yes] [No] [Abstain]`) for council members when a decree is opened.
 - Text log of final decrees for season history.
 - All interaction done in-game via `/decrees` commands.
 
@@ -44,8 +48,8 @@ This is a **server-side** mod. Clients do **not** need to install it.
 4. Edit the config files under:
 
    ~~~text
-   config/decrees/council.json
-   config/decrees/voting_rules.json
+   config/decrees_of_the_six/council.json
+   config/decrees_of_the_six/voting_rules.json
    ~~~
 
 5. Use `/decrees reload` in-game (as an op) after editing configs, or restart the server.
@@ -56,7 +60,7 @@ This is a **server-side** mod. Clients do **not** need to install it.
 
 ### 1. `council.json`
 
-Defines global flags, the council name, and council seats.
+Defines global flags, the council name, ceremony sound, and council seats.
 
 Example:
 
@@ -65,6 +69,7 @@ Example:
   "councilName": "Hexarchate of Salmon",
   "decreesEnabled": true,
   "opsOnly": false,
+  "ceremonySound": "decrees_of_the_six:council_chime",
   "seats": [
     {
       "id": "overseer_regent",
@@ -88,6 +93,11 @@ Example:
 - `opsOnly` (boolean)  
   - `false` → only council seats can create/open/vote (normal mode).  
   - `true` → only ops can create/open/delete/vote on decrees (safety mode / emergency override).
+
+- `ceremonySound` (string, optional)  
+  - Resource location of the sound event used for the council ceremony broadcast.  
+  - Example: `"decrees_of_the_six:council_chime"` for a sound defined in your `sounds.json`.  
+  - If missing or invalid, the mod falls back to a vanilla toast sound.
 
 - `seats` (array) – each seat:
   - `id` – internal ID (e.g. `"overseer_regent"`). Used in saves & logs.  
@@ -143,7 +153,7 @@ Example:
 Finalised decrees (status becomes **ENACTED**, **REJECTED**, or **CANCELLED**) are appended to a history log, e.g.:
 
 ~~~text
-config/decrees/decrees_history.log
+config/decrees_of_the_six/decrees_history.log
 ~~~
 
 The log typically includes:
@@ -197,7 +207,7 @@ Typical flow for a council session:
 
    ~~~text
    /decrees decree create <title>
-   ~~~
+   ~~~  
 
    This creates a new decree in **DRAFT** status, linked to their seat.
 
@@ -209,16 +219,16 @@ Typical flow for a council session:
    /decrees decree edit category <id> <category>
    /decrees decree edit expiry <id> none
    /decrees decree edit expiry <id> <days>
-   ~~~
+   ~~~  
 
 3. **Open for voting (VOTING)**  
 
    ~~~text
    /decrees decree open <id>
-   ~~~
+   ~~~  
 
    - Starts the voting timer (`votingDurationMinutes`) if configured.  
-   - Notifies council members.
+   - Notifies council members, including clickable `[Yes] [No] [Abstain]` buttons in chat.
 
 4. **Council votes**  
    Each council seat holder uses:
@@ -227,7 +237,9 @@ Typical flow for a council session:
    /decrees vote <id> yes
    /decrees vote <id> no
    /decrees vote <id> abstain
-   ~~~
+   ~~~  
+
+   or clicks the vote buttons to prefill the vote command.
 
 5. **Automatic resolution**  
 
@@ -258,6 +270,7 @@ This command:
 - Enables the decree system (`decreesEnabled = true`).
 - Switches back to council mode (`opsOnly = false`).
 - Broadcasts a global message announcing that the council has convened or re-convened.
+- Plays the configured **ceremony sound** (`ceremonySound` in `council.json`) to all online players.
 - Launches multiple fireworks at the executor’s position.
 
 Use this once per season when the council is founded, or again if you want to ceremonially “re-convene” it after changes.
@@ -314,7 +327,7 @@ Use this once per season when the council is founded, or again if you want to ce
 ### 2. Council Ceremony
 
 - `/decrees council create <name>` (op only)  
-  Convene or re-convene the council, set the council name, enable decrees, and trigger the ceremony broadcast + fireworks.
+  Convene or re-convene the council, set the council name, enable decrees, and trigger the ceremony broadcast + configurable sound + fireworks.
 
 ---
 
@@ -331,11 +344,14 @@ Use this once per season when the council is founded, or again if you want to ce
 - `/decrees decree list [page]`  
   List all decrees (paginated).
 
-- `/decrees decree list my`  
-  List decrees created by your seat (council members only).
+- `/decrees decree list my [page]`  
+  List decrees created by your seat (council members only), with pagination.
 
-- `/decrees decree list active`  
-  List all decrees currently in **VOTING**, including your own vote if you hold a seat.
+- `/decrees decree list active [page]`  
+  List all decrees currently in **VOTING**, including your own vote if you hold a seat, with pagination.
+
+- `/decrees decree list status <draft|voting|enacted|rejected|cancelled> [page]`  
+  List decrees filtered by status, with pagination.
 
 - `/decrees decree list category <category>`  
   List decrees in a given category.
@@ -369,7 +385,8 @@ Use this once per season when the council is founded, or again if you want to ce
 ### 5. Voting
 
 - `/decrees vote <id> yes|no|abstain`  
-  Cast your seat’s vote on a decree currently in **VOTING**.
+  Cast your seat’s vote on a decree currently in **VOTING**.  
+  (Can also be filled in via the clickable `[Yes] [No] [Abstain]` hints.)
 
 ---
 

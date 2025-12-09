@@ -6,6 +6,19 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.3] – Ceremony & UX polish
+
+- Added **configurable council ceremony sound** via `ceremonySound` in `council.json`.  
+  - Supports custom sound events like `decrees_of_the_six:council_chime` (e.g. ElevenLabs chime bundled as `council_chime.ogg`).
+  - Plays to all online players when the council is created or reconvened, without chat spam.
+- Standardized decree messaging through `Messenger` with a consistent `[Hexarchate]`-style prefix.
+- Added clickable vote hints when a decree enters voting:
+  - Council members now see `Cast your vote: [Yes] [No] [Abstain]` buttons, which prefill `/decrees decree vote <id> <yes/no/abstain>`.
+- Improved listing & browsing:
+  - `/decrees decree list status <draft|voting|enacted|rejected|cancelled> [page]` to filter by status.
+  - `/decrees decree list active [page]` and `/decrees decree list my [page]` now support pagination.
+- Updated `/decrees help` to reflect all current commands and subcommands.
+
 ## [0.1.2] - 2025-12-09
 
 ### Added
