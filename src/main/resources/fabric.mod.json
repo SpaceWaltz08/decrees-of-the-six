@@ -1,0 +1,41 @@
+{
+	"schemaVersion": 1,
+	"id": "decrees_of_the_six",
+	"version": "0.1.0",
+	"name": "SpaceWaltz – Decrees of the Six",
+	"description": "A governance and economy framework: councils of six, decrees, reputation, and player-driven law.",
+	"authors": [
+		"SpaceWaltz08"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "MIT",
+	"icon": "assets/decrees_of_the_six/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.spacewaltz.decrees.DecreesOfTheSix"
+		],
+		"client": [
+			"com.spacewaltz.decrees.SpacewaltzDecreesOfTheSixClient"
+		]
+	},
+	"mixins": [
+		"decrees_of_the_six.mixins.json",
+		{
+			"config": "decrees_of_the_six.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.18.1",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"another-mod": "*"
+	}
+}
