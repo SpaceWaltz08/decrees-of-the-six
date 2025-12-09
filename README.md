@@ -3,7 +3,7 @@
 A Fabric server-side governance & voting system designed for council-style roleplay servers.  
 The Hexarchate (or any council you define) can create, debate, and vote on decrees in-game, with automatic quorum/majority handling and a season history log.
 
-**Current version:** 0.1.1 (Minecraft 1.21.1, Fabric)
+**Current version:** 0.1.2 (Minecraft 1.21.1, Fabric)
 
 ---
 
@@ -12,12 +12,15 @@ The Hexarchate (or any council you define) can create, debate, and vote on decre
 - Council seats defined via JSON (`council.json`).
 - **Named councils** with a configurable `councilName` used in decree-related messages.
 - **Council ceremony** command to convene or re-convene the council with a server-wide broadcast and fireworks.
-- Decrees with lifecycle: **DRAFT → VOTING → ENACTED/REJECTED**.
+- Decrees with lifecycle: **DRAFT → VOTING → ENACTED/REJECTED/CANCELLED**.
 - Configurable voting rules (quorum, duration, majority mode, ties).
 - Global toggles: enable/disable the whole decree system or restrict it to ops.
 - Seat tools for assigning council members.
 - **Join reminder** for council members with pending votes.
 - **One-vote-remaining ping** when only one seat is left to vote on a decree.
+- **Paginated decree lists & in-game history** via `/decrees decree list [page]` and `/decrees history [page]`.
+- **Seat statistics & status helpers** via `/decrees stats ...` and `/decrees status [id]`.
+- **Clean chat formatting & tab completion** for decree IDs, seat IDs, and categories.
 - Text log of final decrees for season history.
 - All interaction done in-game via `/decrees` commands.
 
@@ -137,7 +140,7 @@ Example:
 
 ### 3. Decree History Log
 
-Finalised decrees (status becomes **ENACTED** or **REJECTED**) are appended to a history log, e.g.:
+Finalised decrees (status becomes **ENACTED**, **REJECTED**, or **CANCELLED**) are appended to a history log, e.g.:
 
 ~~~text
 config/decrees/decrees_history.log
@@ -233,12 +236,13 @@ Typical flow for a council session:
    - Quorum is reached **and**
    - All active seats have voted **or** voting time has expired,
 
-   the system automatically sets the decree to **ENACTED** or **REJECTED** according to the rules in `voting_rules.json`, then logs the change and notifies the council.
+   the system automatically sets the decree to **ENACTED**, **REJECTED**, or (if forced) **CANCELLED** according to the rules in `voting_rules.json`, then logs the change and notifies the council.
 
 6. **Review results / history**
 
    - `/decrees decree results <id>` – detailed counts, quorum info, timer state.  
-   - History log in `decrees_history.log` for permanent record.
+   - History log in `decrees_history.log` for permanent record.  
+   - `/decrees history [page]` for an in-game, paginated history view.
 
 ---
 
@@ -278,6 +282,33 @@ Use this once per season when the council is founded, or again if you want to ce
 - `/decrees reload` (op only)  
   Reload `council.json` and `voting_rules.json` from disk.
 
+- `/decrees status`  
+  Show voting status for all decrees currently in **VOTING**.
+
+- `/decrees status <id>`  
+  Show detailed voting status for a specific decree.
+
+- `/decrees history [page]`  
+  Paginated history of completed decrees.
+
+- `/decrees config decreesEnabled on|off` (op only)  
+  Enable or disable the decrees system globally.
+
+- `/decrees config opsOnly on|off` (op only)  
+  Toggle ops-only mode.
+
+- `/decrees config show` (op only)  
+  Show current system status, including council name and your seat (if any).
+
+- `/decrees stats seats`  
+  Show per-seat statistics for created decrees and votes.
+
+- `/decrees stats me`  
+  Show statistics for your own seat.
+
+- `/decrees stats seat <seat_id>`  
+  Show statistics for a specific seat.
+
 ---
 
 ### 2. Council Ceremony
@@ -297,14 +328,17 @@ Use this once per season when the council is founded, or again if you want to ce
 
 ### 4. Decree Management
 
-- `/decrees decree list`  
-  List all decrees.
+- `/decrees decree list [page]`  
+  List all decrees (paginated).
 
 - `/decrees decree list my`  
   List decrees created by your seat (council members only).
 
 - `/decrees decree list active`  
   List all decrees currently in **VOTING**, including your own vote if you hold a seat.
+
+- `/decrees decree list category <category>`  
+  List decrees in a given category.
 
 - `/decrees decree info <id>`  
   Show full info (title, description, category, expiry, creator, votes).
@@ -327,7 +361,7 @@ Use this once per season when the council is founded, or again if you want to ce
 - `/decrees decree delete <id>`  
   Delete a decree (council only / ops depending on config).
 
-- `/decrees decree force <id> enacted|rejected` (op only)  
+- `/decrees decree force <id> enacted|rejected|cancelled` (op only)  
   Force the final status of a decree (escape hatch if rules misbehave or get stuck).
 
 ---
@@ -348,6 +382,7 @@ Use this once per season when the council is founded, or again if you want to ce
   - `/decrees council create <name>`
   - `/decrees seat ...`
   - `/decrees decree force ...`
+  - `/decrees config ...`
 - When `opsOnly = true`, ops can also create/open/delete/vote on decrees even without a seat.
 
 **Council members** (players who hold a seat):

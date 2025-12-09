@@ -2,103 +2,207 @@ package com.spacewaltz.decrees.decree;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.spacewaltz.decrees.council.CouncilConfig;
+import com.spacewaltz.decrees.council.CouncilConfigData;
+import com.spacewaltz.decrees.DecreesOfTheSix;
+import com.spacewaltz.decrees.council.SeatDefinition;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
+/**
+ * Stores all decrees in decrees.json on disk.
+ */
 public class DecreeStore {
 
     private static final Gson GSON = new GsonBuilder()
             .setPrettyPrinting()
             .create();
 
-    private static final Path DATA_DIR = FabricLoader.getInstance()
+    private static final Path CONFIG_DIR = FabricLoader.getInstance()
             .getConfigDir()
-            .resolve("decrees_of_the_six");
+            .resolve(DecreesOfTheSix.MOD_ID);
 
-    private static final Path DATA_PATH = DATA_DIR.resolve("decrees.json");
+    private static final Path STORE_PATH = CONFIG_DIR.resolve("decrees.json");
 
-    private static DecreeData INSTANCE;
+    // Singleton instance
+    private static DecreeStore INSTANCE = new DecreeStore();
 
-    public static DecreeData get() {
-        if (INSTANCE == null) {
-            load();
-        }
+    public int nextId = 1;
+    public List<Decree> decrees = new ArrayList<>();
+
+    public static DecreeStore get() {
         return INSTANCE;
     }
 
     public static void load() {
         try {
-            if (!Files.exists(DATA_DIR)) {
-                Files.createDirectories(DATA_DIR);
+            if (!Files.exists(CONFIG_DIR)) {
+                Files.createDirectories(CONFIG_DIR);
             }
 
-            if (!Files.exists(DATA_PATH)) {
-                INSTANCE = new DecreeData();
+            if (!Files.exists(STORE_PATH)) {
+                INSTANCE = new DecreeStore();
                 save();
                 return;
             }
 
-            try (Reader reader = Files.newBufferedReader(DATA_PATH)) {
-                DecreeData data = GSON.fromJson(reader, DecreeData.class);
-                if (data == null || data.decrees == null) {
-                    data = new DecreeData();
-                }
-                INSTANCE = data;
+            String json = Files.readString(STORE_PATH, StandardCharsets.UTF_8).trim();
+            if (json.isEmpty()) {
+                INSTANCE = new DecreeStore();
+                return;
+            }
+
+            DecreeStore loaded = GSON.fromJson(json, DecreeStore.class);
+            if (loaded == null) {
+                INSTANCE = new DecreeStore();
+            } else {
+                INSTANCE = loaded;
             }
         } catch (IOException e) {
-            e.printStackTrace();
-            INSTANCE = new DecreeData();
+            DecreesOfTheSix.LOGGER.error("Failed to load decrees from " + STORE_PATH, e);
+            INSTANCE = new DecreeStore();
         }
     }
 
     public static void save() {
-        if (INSTANCE == null) return;
-
         try {
-            if (!Files.exists(DATA_DIR)) {
-                Files.createDirectories(DATA_DIR);
+            if (!Files.exists(CONFIG_DIR)) {
+                Files.createDirectories(CONFIG_DIR);
             }
-
-            try (Writer writer = Files.newBufferedWriter(DATA_PATH)) {
-                GSON.toJson(INSTANCE, writer);
-            }
+            String json = GSON.toJson(INSTANCE);
+            Files.writeString(STORE_PATH, json, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            e.printStackTrace();
+            DecreesOfTheSix.LOGGER.error("Failed to save decrees to " + STORE_PATH, e);
         }
     }
 
     public static Decree createDecree(String title, String createdBySeatId) {
-        DecreeData data = get();
-
-        int maxId = 0;
-        for (Decree d : data.decrees) {
-            if (d.id > maxId) {
-                maxId = d.id;
-            }
-        }
+        DecreeStore store = get();
 
         Decree decree = new Decree();
-        decree.id = maxId + 1;
-        decree.title = title;
-        decree.description = "";
-        decree.category = "";
-        decree.expiresAt = null;
-
-        decree.createdBySeatId = createdBySeatId;
+        decree.id = store.nextId++;
         decree.status = DecreeStatus.DRAFT;
-        decree.createdAt = System.currentTimeMillis();
-        decree.votingOpenedAt = null;
+        decree.title = title;
+        decree.createdBySeatId = createdBySeatId;
+        // decree.createdAt = System.currentTimeMillis(); // <-- REMOVED THIS LINE (keeping this in case I need it again)
+        decree.votes.clear();
 
-        data.decrees.add(decree);
+        store.decrees.add(decree);
         save();
-
         return decree;
     }
+
+    public static boolean setStatus(Decree decree, DecreeStatus newStatus, String reason) {
+        if (decree == null) {
+            return false;
+        }
+
+        DecreeStatus oldStatus = decree.status;
+        if (oldStatus == newStatus) {
+            return false;
+        }
+
+        // Guardrails: prevent clearly illegal transitions.
+        if (!isLegalTransition(oldStatus, newStatus)) {
+            DecreesOfTheSix.LOGGER.warn(
+                    "Blocked illegal decree state transition {} -> {} on #{} (reason: {}).",
+                    oldStatus, newStatus, decree.id, reason
+            );
+            return false;
+        }
+
+        decree.status = newStatus;
+
+        // For final states, log to season history
+        if (newStatus == DecreeStatus.ENACTED
+                || newStatus == DecreeStatus.REJECTED
+                || newStatus == DecreeStatus.CANCELLED) {
+
+            int yes = 0;
+            int no = 0;
+            int abstain = 0;
+            for (VoteChoice v : decree.votes.values()) {
+                if (v == VoteChoice.YES) yes++;
+                else if (v == VoteChoice.NO) no++;
+                else if (v == VoteChoice.ABSTAIN) abstain++;
+            }
+
+            CouncilConfigData cfg = CouncilConfig.get();
+            int totalActiveSeats = (int) cfg.seats.stream()
+                    .filter(s -> s.holderUuid != null)
+                    .count();
+
+            VotingRulesData rules = VotingRulesConfig.get();
+            if (rules == null) {
+                rules = new VotingRulesData();
+            }
+
+            int minVotesRequired;
+            if (totalActiveSeats <= 0 || rules.minQuorumPercent <= 0) {
+                minVotesRequired = 0;
+            } else if (rules.minQuorumPercent >= 100) {
+                minVotesRequired = totalActiveSeats;
+            } else {
+                double fraction = rules.minQuorumPercent / 100.0;
+                minVotesRequired = (int) Math.ceil(totalActiveSeats * fraction);
+            }
+
+            int votesCast = decree.votes.size();
+            boolean hasQuorum = (minVotesRequired == 0) || (votesCast >= minVotesRequired);
+
+            DecreeHistoryLogger.recordFinalState(
+                    decree,
+                    newStatus,
+                    yes,
+                    no,
+                    abstain,
+                    hasQuorum
+            );
+        }
+
+        save();
+
+        DecreesOfTheSix.LOGGER.info(
+                "Decree #{} status {} -> {} (reason: {}).",
+                decree.id, oldStatus, newStatus, reason
+        );
+
+        return true;
+    }
+
+    private static boolean isLegalTransition(DecreeStatus oldStatus, DecreeStatus newStatus) {
+        if (oldStatus == null) {
+            return true;
+        }
+
+        switch (oldStatus) {
+            case DRAFT:
+                // DRAFT can go to VOTING or any final state.
+                return newStatus == DecreeStatus.VOTING
+                        || newStatus == DecreeStatus.CANCELLED
+                        || newStatus == DecreeStatus.ENACTED
+                        || newStatus == DecreeStatus.REJECTED;
+            case VOTING:
+                // VOTING can only go to final states.
+                return newStatus == DecreeStatus.ENACTED
+                        || newStatus == DecreeStatus.REJECTED
+                        || newStatus == DecreeStatus.CANCELLED;
+            case ENACTED:
+            case REJECTED:
+            case CANCELLED:
+                // Final states are terminal.
+                return newStatus == oldStatus;
+            default:
+                return false;
+        }
+    }
+
 
     public static Decree find(int id) {
         for (Decree d : get().decrees) {

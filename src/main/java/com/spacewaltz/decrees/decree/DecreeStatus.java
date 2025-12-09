@@ -4,5 +4,6 @@ public enum DecreeStatus {
     DRAFT,
     VOTING,
     ENACTED,
-    REJECTED
+    REJECTED,
+    CANCELLED   // <-- new final state for withdrawn / void decrees
 }

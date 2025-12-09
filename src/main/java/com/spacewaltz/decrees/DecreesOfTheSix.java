@@ -5,11 +5,16 @@ import com.spacewaltz.decrees.council.CouncilConfig;
 import com.spacewaltz.decrees.council.CouncilUtil;
 import com.spacewaltz.decrees.council.SeatDefinition;
 import com.spacewaltz.decrees.decree.Decree;
+import com.spacewaltz.decrees.decree.DecreeHistoryCommand;
+import com.spacewaltz.decrees.decree.DecreeHistoryLogger;
 import com.spacewaltz.decrees.decree.DecreeStatus;
 import com.spacewaltz.decrees.decree.DecreeStore;
 import com.spacewaltz.decrees.decree.VotingRulesConfig;
+import com.spacewaltz.decrees.DecreesConfig; // your core config (decrees_config.json)
+
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
@@ -27,20 +32,27 @@ public class DecreesOfTheSix implements ModInitializer {
     public void onInitialize() {
         LOGGER.info("Initializing Decrees of the Six...");
 
-        // Core toggles + voting rules
-        DecreesConfig.load();      // decrees_config.json (enabled / opsOnly) – if you still use it
-        CouncilConfig.load();      // council.json
-        VotingRulesConfig.load();  // voting_rules.json
+        // ---- Core config ----
+        DecreesConfig.load();      // decrees_config.json (global toggles)
+        CouncilConfig.load();      // council.json (seats, names, opsOnly, etc.)
+        VotingRulesConfig.load();  // voting_rules.json (quorum, majority, duration)
 
-        // Decrees data
+        // ---- Decrees data & history ----
         DecreeStore.load();        // decrees.json
+        DecreeHistoryLogger.init(); // decree_history.json (season history)
 
-        // Register commands
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
-                CouncilCommands.register(dispatcher)
+        // ---- Command registration ----
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            CouncilCommands.register(dispatcher);       // /decrees ...
+            DecreeHistoryCommand.register(dispatcher);  // /decrees history
+        });
+
+        // ---- Auto-close expired decrees on server tick ----
+        ServerTickEvents.END_SERVER_TICK.register(server ->
+                CouncilCommands.tickAutoClose(server)
         );
 
-        // Council-member join reminder with per-seat pending list
+        // ---- Council-member join reminder (pending votes) ----
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             ServerPlayerEntity player = handler.getPlayer();
 
@@ -92,7 +104,7 @@ public class DecreesOfTheSix implements ModInitializer {
      * Shared prefix using the configured council name if present.
      * Falls back to [Decrees] if no name is set.
      */
-    private static String getPrefix() {
+    public static String getPrefix() {
         String name = CouncilConfig.get().councilName;
         if (name == null || name.isBlank()) {
             return "§6[Decrees]";
