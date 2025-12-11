@@ -167,8 +167,10 @@ public final class CouncilConfig {
         if (cfg.councilName == null || cfg.councilName.isBlank()) {
             cfg.councilName = "The Council";
         }
+
+        // NEW: ensure ceremonySound always has a sane default
         if (cfg.ceremonySound == null || cfg.ceremonySound.isBlank()) {
-            cfg.ceremonySound = "minecraft:ui.toast.challenge_complete";
+            cfg.ceremonySound = "decrees_of_the_six:council_chime";
         }
 
         if (cfg.decreesEnabled && cfg.seats.isEmpty()) {

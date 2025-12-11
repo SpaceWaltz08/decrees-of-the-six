@@ -6,6 +6,95 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] – Economy Foundations (Phase 1)
+
+### New – Core Currency & Accounts
+- Added a **server-side global currency system** with three denominations:
+  - Gold, Silver, Copper (backed by a single internal “copper” value).
+  - Currency **name is configurable** (e.g. “Scales”) while the G/S/C structure is fixed.
+- Introduced **persistent accounts**:
+  - Each player automatically gets an account on first join (balance starts at 0).
+  - Added a dedicated **Treasury account** for server-side operations.
+- All balances and transactions are saved as part of the mod’s economy data and are written on world save / clean shutdown.
+
+### New – Transaction & Ledger Model
+- Every movement of money is now stored as a **typed transaction**:
+  - `PLAYER_PAYMENT`, `ADMIN_GRANT`, `ADMIN_SEIZE`, plus Treasury operations.
+- Added helper rules:
+  - No negative balances allowed.
+  - Zero or negative transfer amounts are rejected with clear error messages.
+  - Transfers to offline players are supported (by UUID).
+  - Self-payments are blocked as invalid.
+- Introduced internal helpers to convert between **copper ↔ Gold/Silver/Copper** for both storage and display.
+
+### New – Player Commands
+- **`/money`**  
+  - `/money` or `/money balance` shows **your balance** in compact G/S/C format, e.g.  
+    `Balance: 1G 4S 50C Scales`.
+- **`/money pay <player> <amount>`**  
+  - Pays another player from your account.
+  - `<amount>` accepts:
+    - Plain copper: `150` (150C).
+    - Coin strings: `10g`, `5s`, `20c`, or combinations like `1g 4s 50c`.
+  - Command validates:
+    - Target exists.
+    - Amount is > 0.
+    - Sender has enough funds.
+  - Both sender and receiver get coloured chat messages showing **full G/S/C breakdown**.
+
+### New – Admin / Operator Commands
+> Replaces the old `/ledger` namespace to avoid conflicts with other mods.
+
+- **`/moneyadmin grant <player> <amount>`**  
+  - Mints currency directly into a player’s account.  
+  - Uses the same G/S/C amount syntax as `/money pay` (`1g 4s 50c`, `250`, etc.).
+  - Logged as an `ADMIN_GRANT` transaction.
+- **`/moneyadmin seize <player> <amount>`**  
+  - Removes money from a player’s account (to Treasury or burn, depending on config / rule).  
+  - Same G/S/C amount syntax.  
+  - Logged as `ADMIN_SEIZE`.
+- **`/moneyadmin treasury`**  
+  - Shows the **Treasury account balance** in G/S/C.
+- **`/moneyadmin log [count]`**  
+  - Shows the latest N transactions (default ~10–20), each line with:
+    - Timestamp.
+    - Amount in Gold/Silver/Copper (e.g. `+1G 4S 50C Scales`).
+    - From → To.
+    - Transaction type tag (payment / grant / seizure / treasury op).
+- **`/economy help`**  
+  - Lists all economy-related commands and basic usage.
+- **`/economy reload`**  
+  - Reloads the economy config (currency name, conversion rates, etc.) without restarting the server.
+
+### New – G-Key Economy Panel (Client UI)
+- Bound a new **G-key panel** (client-side) that talks to the server via Fabric networking:
+  - Opens/closes with **G**.
+  - **Header**:
+    - Player name (or seat label).
+    - Current balance in **G/S/C** with the configured currency name.
+  - **Ledger tab**:
+    - Title: “Recent Transactions”.
+    - Displays the last 5–10 transactions relevant to that player, each showing:
+      - Signed amount in G/S/C (e.g. `+1G 4S 50C`).
+      - Counterparty (“from System”, “to Treasury”, other player names, etc.).
+      - Transaction type in brackets (`(payment)`, `(grant)`, `(seizure)`).
+- Visuals:
+  - Removed the blurred world background; the panel now uses a **solid dark rect** for readability while still letting the world be faintly visible around it.
+  - All text colours are tuned so they remain readable even at dusk/night in-game.
+
+### Internal / Technical
+- Added dedicated **economy networking payloads** for snapshot requests:
+  - Client sends a “snapshot request” when the G-panel opens.
+  - Server responds with balance + recent transactions as a compact payload.
+- Centralised all economy logic into:
+  - `EconomyAccount`, `EconomyStore`, `EconomyTransaction`, `EconomyService`, `EconomyConfig`, `EconomyNetworking`, and client-side `ClientEconomyState`.
+- Safe-guarded network registration to avoid duplicate payload registrations during dev reloads.
+
+---
+
+This version is the **Phase 1 foundation** of the economy: a single configurable currency, proper accounts, transaction logging, admin tools, and a first in-game UI. No decree / council features were removed; this update is fully additive.
+
+
 ## [0.1.3] – Ceremony & UX polish
 
 - Added **configurable council ceremony sound** via `ceremonySound` in `council.json`.  

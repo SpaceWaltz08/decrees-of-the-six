@@ -1,9 +1,9 @@
 # Decrees of the Six
 
-A Fabric server-side governance & voting system designed for council-style roleplay servers.  
-The Hexarchate (or any council you define) can create, debate, and vote on decrees in-game, with automatic quorum/majority handling and a season history log.
+A Fabric server-side governance, voting, and lightweight economy system designed for council-style roleplay servers.  
+The Hexarchate (or any council you define) can create, debate, and vote on decrees in-game, with automatic quorum/majority handling, a season history log, and an optional multi-tier currency (Gold/Silver/Copper by default).
 
-**Current version:** 0.1.3 (Minecraft 1.21.1, Fabric)
+**Current version:** 0.2.0 (Minecraft 1.21.1, Fabric)
 
 ---
 
@@ -28,6 +28,19 @@ The Hexarchate (or any council you define) can create, debate, and vote on decre
 - Text log of final decrees for season history.
 - All interaction done in-game via `/decrees` commands.
 
+### Economy / Money System
+
+- Optional **single currency with three denominations** (default: Gold, Silver, Copper Scales).
+- Configurable names and conversion ratios via `economy_config.json`.
+- Persistent JSON-backed store of accounts and transactions (per-player account + Treasury account).
+- **Player commands** (`/money`) for checking balances, paying other players, and viewing your transaction log.
+- **Admin commands** (`/moneyadmin`) for granting / seizing money and managing the Treasury.
+- **Economy meta commands** (`/economy`) for help and live reloading of economy config.
+- Amounts are always shown in `G/S/C` form (e.g. `2G 4S 30C Scales`).
+- Optional **G-key “Hexarchate Panel” UI** (if the client also loads the mod) showing:
+  - Player name and balance in G/S/C.
+  - Recent transactions formatted in G/S/C.
+
 ---
 
 ## Requirements
@@ -36,7 +49,8 @@ The Hexarchate (or any council you define) can create, debate, and vote on decre
 - **Fabric Loader** (matching your server version).
 - **Fabric API**.
 
-This is a **server-side** mod. Clients do **not** need to install it.
+This is primarily a **server-side** mod. Clients do **not** need to install it to use `/decrees` and the money commands.  
+Installing the mod on the **client** is optional but enables the G-key “Hexarchate Panel” screen.
 
 ---
 
@@ -50,9 +64,10 @@ This is a **server-side** mod. Clients do **not** need to install it.
    ~~~text
    config/decrees_of_the_six/council.json
    config/decrees_of_the_six/voting_rules.json
+   config/decrees_of_the_six/economy_config.json
    ~~~
 
-5. Use `/decrees reload` in-game (as an op) after editing configs, or restart the server.
+5. Use `/decrees reload` and `/economy reload` in-game (as an op) after editing configs, or restart the server.
 
 ---
 
@@ -165,6 +180,44 @@ The log typically includes:
 - A compact summary of votes  
 
 This is meant for season records / lore.
+
+---
+
+### 4. `economy_config.json`
+
+Controls how the currency behaves and how amounts are displayed.
+
+Example:
+
+~~~json
+{
+  "enabled": true,
+  "currencyName": "Scales",
+  "goldName": "Gold",
+  "silverName": "Silver",
+  "copperName": "Copper",
+  "copperPerSilver": 10,
+  "copperPerGold": 100
+}
+~~~
+
+**Fields (high level):**
+
+- `enabled` (boolean)  
+  - If `false`, the money system is effectively disabled (commands will refuse to run).
+
+- `currencyName` (string)  
+  - Base display name, e.g. `"Scales"`, `"Crowns"`, `"Marks"`.
+
+- `goldName`, `silverName`, `copperName` (strings)  
+  - Display names for each denomination.  
+  - Used in chat and UI.
+
+- `copperPerSilver`, `copperPerGold` (ints)  
+  - Conversion rates to the smallest unit (copper).  
+  - Example above → `1 Silver = 10 Copper`, `1 Gold = 100 Copper`.
+
+Economy data (accounts + transactions) is stored in a separate JSON file (e.g. `economy_store.json`) next to your other Decrees config. It is not meant to be edited by hand.
 
 ---
 
@@ -390,6 +443,52 @@ Use this once per season when the council is founded, or again if you want to ce
 
 ---
 
+### 6. Economy & Money
+
+**Player-facing commands:**
+
+- `/money`  
+  Show your own balance in `G/S/C` form.
+
+- `/money balance <player>`  
+  Show another player’s balance.
+
+- `/money pay <player> <amount>`  
+  Pay another player.  
+  - `<amount>` supports:
+    - Raw copper integer (e.g. `150`)
+    - Denominated strings such as `1G 5S 20C`, `2g`, `10s`, `50c` (case-insensitive).
+
+- `/money log`  
+  Show your recent transactions.
+
+**Admin / treasury commands:**
+
+- `/moneyadmin grant <player> <amount>`  
+  Mint money directly to a player.
+
+- `/moneyadmin seize <player> <amount>`  
+  Remove money from a player.
+
+- `/moneyadmin treasury deposit <amount>`  
+  Move money from the executor to the Treasury.
+
+- `/moneyadmin treasury withdraw <amount>`  
+  Move money from the Treasury to the executor.
+
+- `/moneyadmin log`  
+  Show recent transactions across the whole system (for audit).
+
+**Economy meta:**
+
+- `/economy help`  
+  Overview of all money and treasury commands, plus a short explanation of denominations.
+
+- `/economy reload` (op only)  
+  Reload `economy_config.json` from disk.
+
+---
+
 ## Permissions Summary
 
 **Ops:**
@@ -400,6 +499,8 @@ Use this once per season when the council is founded, or again if you want to ce
   - `/decrees seat ...`
   - `/decrees decree force ...`
   - `/decrees config ...`
+  - `/economy reload`
+  - All `/moneyadmin ...` commands
 - When `opsOnly = true`, ops can also create/open/delete/vote on decrees even without a seat.
 
 **Council members** (players who hold a seat):
@@ -411,12 +512,14 @@ Use this once per season when the council is founded, or again if you want to ce
 **Regular players:**
 
 - Can typically view decree lists and info (if you keep those commands open).
+- Can use `/money`, `/money balance`, `/money pay`, and `/money log` if the economy is enabled.
 - Cannot create, open, delete, or vote unless:
   - they are given a seat, or
   - you switch to `opsOnly` and make them ops (not recommended).
 
-> **Note:** If `decreesEnabled` is `false`, mutating commands are blocked even for ops  
-> (except `/decrees reload` and `/decrees decree force`).
+> **Note:** If `decreesEnabled` is `false`, mutating decree commands are blocked even for ops  
+> (except `/decrees reload` and `/decrees decree force`).  
+> If `economy_config.enabled` is `false`, all money commands will refuse to run.
 
 ---
 

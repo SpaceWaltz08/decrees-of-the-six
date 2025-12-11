@@ -18,11 +18,6 @@ public class CouncilConfigData {
             "Each seat needs an 'id' and 'displayName'. " +
                     "holderName + holderUuid are optional; they are usually managed in-game via /decrees seat set.";
 
-    /** Optional comment for ceremonySound. */
-    public String _commentCeremonySound =
-            "ceremonySound is the sound event played when the council is convened, " +
-                    "e.g. 'decrees_of_the_six:council_chime'.";
-
     /** Display name used in prefixes like [Hexarchate]. */
     public String councilName = "The Council";
 
@@ -32,8 +27,8 @@ public class CouncilConfigData {
     /** When true, only admins (permissions / ops) can mutate & vote. */
     public boolean opsOnly = false;
 
-    /** Sound event ID used for the council ceremony (see ceremonySound in council.json). */
-    public String ceremonySound = "minecraft:ui.toast.challenge_complete";
+    /** Sound event ID used for the council ceremony chime. */
+    public String ceremonySound = "decrees_of_the_six:council_chime";
 
     /** Declared council seats. */
     public List<SeatDefinition> seats = new ArrayList<>();

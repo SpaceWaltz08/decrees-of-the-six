@@ -11,10 +11,16 @@ import com.spacewaltz.decrees.decree.DecreeStatus;
 import com.spacewaltz.decrees.decree.DecreeStore;
 import com.spacewaltz.decrees.decree.VotingRulesConfig;
 import com.spacewaltz.decrees.DecreesConfig; // your core config (decrees_config.json)
+import com.spacewaltz.decrees.economy.EconomyCommands;
+import com.spacewaltz.decrees.economy.EconomyConfig;
+import com.spacewaltz.decrees.economy.EconomyNetworking;
+import com.spacewaltz.decrees.economy.EconomyService;
+import com.spacewaltz.decrees.economy.EconomyStore;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
@@ -37,6 +43,21 @@ public class DecreesOfTheSix implements ModInitializer {
         CouncilConfig.load();      // council.json (seats, names, opsOnly, etc.)
         VotingRulesConfig.load();  // voting_rules.json (quorum, majority, duration)
 
+        // ---- Economy config & data ----
+        EconomyConfig.load();   // economy_config.json
+        EconomyStore.load();    // economy.json (accounts + transactions)
+        EconomyNetworking.init();
+
+        // Create a money account for each player on first join (if economy enabled)
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            if (!EconomyConfig.get().enabled) {
+                return;
+            }
+
+            ServerPlayerEntity player = handler.getPlayer();
+            EconomyService.getOrCreatePlayerAccount(player.getUuid());
+        });
+
         // ---- Decrees data & history ----
         DecreeStore.load();        // decrees.json
         DecreeHistoryLogger.init(); // decree_history.json (season history)
@@ -45,7 +66,15 @@ public class DecreesOfTheSix implements ModInitializer {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             CouncilCommands.register(dispatcher);       // /decrees ...
             DecreeHistoryCommand.register(dispatcher);  // /decrees history
+            // Player-facing /money
+            EconomyCommands.registerMoneyCommands(dispatcher);
+
+            // Admin-facing /economy and legacy alias /moneyadmin
+            EconomyCommands.registerMoneyAdminCommands(dispatcher);
         });
+
+        // Register server-side economy networking (G-key UI snapshot)
+        EconomyNetworking.init();
 
         // ---- Auto-close expired decrees on server tick ----
         ServerTickEvents.END_SERVER_TICK.register(server ->
@@ -96,6 +125,10 @@ public class DecreesOfTheSix implements ModInitializer {
                     false
             );
         });
+
+        // ---- Save economy store on clean shutdown ----
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> EconomyStore.save());
+
 
         LOGGER.info("Decrees of the Six initialized.");
     }
