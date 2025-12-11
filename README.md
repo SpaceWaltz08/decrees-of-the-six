@@ -1,9 +1,9 @@
 # Decrees of the Six
 
-A Fabric server-side governance, voting, and lightweight economy system designed for council-style roleplay servers.  
-The Hexarchate (or any council you define) can create, debate, and vote on decrees in-game, with automatic quorum/majority handling, a season history log, and an optional multi-tier currency (Gold/Silver/Copper by default).
+A Fabric server-side governance, voting, lightweight economy, and guild system designed for council-style roleplay servers.  
+The Hexarchate (or any council you define) can create, debate, and vote on decrees in-game, with automatic quorum/majority handling, a season history log, an optional multi-tier currency (Gold/Silver/Copper by default), and player guilds with shared treasuries.
 
-**Current version:** 0.2.0 (Minecraft 1.21.1, Fabric)
+**Current version:** 0.2.1 (Minecraft 1.21.1, Fabric)
 
 ---
 
@@ -26,20 +26,68 @@ The Hexarchate (or any council you define) can create, debate, and vote on decre
 - **Clean chat formatting & tab completion** for decree IDs, seat IDs, and categories.
 - **Clickable vote hints** (buttons `[Yes] [No] [Abstain]`) for council members when a decree is opened.
 - Text log of final decrees for season history.
-- All interaction done in-game via `/decrees` commands.
+- **Optional guild system**:
+  - Player-created guilds with ranks (`Leader / Officer / Veteran / Member / Recruit`),
+  - Per-guild customizable rank titles,
+  - Each guild has its own Treasury account in the same economy,
+  - Vox Imperion tools for inspecting and moderating guilds.
+- **Optional Hexarchate Panel UI (G-key)** (if the client also loads the mod) with:
+  - A **Ledger tab** for player balance and transactions,
+  - A **Guild tab** showing guild name, rank, member counts, and guild Treasury balance, plus quick actions (deposit / leave / accept invites).
+- All interaction done in-game via `/decrees`, `/money`, `/economy`, `/guild`, and `/vox guild` commands.
 
-### Economy / Money System
+---
+
+## Economy / Money System
 
 - Optional **single currency with three denominations** (default: Gold, Silver, Copper Scales).
 - Configurable names and conversion ratios via `economy_config.json`.
-- Persistent JSON-backed store of accounts and transactions (per-player account + Treasury account).
-- **Player commands** (`/money`) for checking balances, paying other players, and viewing your transaction log.
+- Persistent JSON-backed store of accounts and transactions (per-player account + global Treasury account + guild Treasuries).
+- **Player commands** (`/money`) for checking balances, paying other players, and viewing your own transaction log.
 - **Admin commands** (`/moneyadmin`) for granting / seizing money and managing the Treasury.
 - **Economy meta commands** (`/economy`) for help and live reloading of economy config.
 - Amounts are always shown in `G/S/C` form (e.g. `2G 4S 30C Scales`).
-- Optional **G-key “Hexarchate Panel” UI** (if the client also loads the mod) showing:
-  - Player name and balance in G/S/C.
-  - Recent transactions formatted in G/S/C.
+- **G-key “Hexarchate Panel” UI** (client-side optional):
+  - **Ledger tab**:
+    - Player name and balance in G/S/C,
+    - Recent transactions formatted in G/S/C.
+  - **Guild tab**:
+    - Guild name and your guild rank/title,
+    - Leader and member counts per rank,
+    - Guild Treasury balance in G/S/C,
+    - Pending invite count,
+    - Quick buttons to deposit, leave, or accept invites (front-end to `/guild` commands).
+
+---
+
+## Guilds & Vox Imperion
+
+The guild system is fully server-side and uses the same economy backend. Guilds are stored persistently in a world data file managed by the mod (not meant to be edited manually).
+
+### Guild Basics
+
+- A player can be a member of **at most one guild** at a time.
+- Each guild has:
+  - A unique internal ID and a **name**,
+  - A **Leader** (player UUID),
+  - Members with one of 5 ranks:
+    - `Leader`, `Officer`, `Veteran`, `Member`, `Recruit`,
+  - A **Treasury account** in the economy system,
+  - Optional settings: MOTD/description, open-join flag, and max members.
+- Each guild can customize the **display titles** for ranks:
+  - e.g. `Leader = "High Chancellor"`, `Officer = "First Blade"`, etc.
+
+### Guild Ranks & Titles
+
+Internal permission roles:
+
+- `Leader` – full control.
+- `Officer` – strong management powers.
+- `Veteran` – minor management powers.
+- `Member` – normal access, no management.
+- `Recruit` – probationary / newcomer.
+
+Each role can have a **guild-specific title**, set by the guild leader, for flavour/RP. Internally, permissions are based on the roles; titles are just display.
 
 ---
 
@@ -49,7 +97,7 @@ The Hexarchate (or any council you define) can create, debate, and vote on decre
 - **Fabric Loader** (matching your server version).
 - **Fabric API**.
 
-This is primarily a **server-side** mod. Clients do **not** need to install it to use `/decrees` and the money commands.  
+This is primarily a **server-side** mod. Clients do **not** need to install it to use `/decrees`, `/money`, or `/guild` commands.  
 Installing the mod on the **client** is optional but enables the G-key “Hexarchate Panel” screen.
 
 ---
@@ -61,13 +109,13 @@ Installing the mod on the **client** is optional but enables the G-key “Hexarc
 3. Start the server once to generate default config files.
 4. Edit the config files under:
 
-   ~~~text
-   config/decrees_of_the_six/council.json
-   config/decrees_of_the_six/voting_rules.json
-   config/decrees_of_the_six/economy_config.json
-   ~~~
+       config/decrees_of_the_six/council.json
+       config/decrees_of_the_six/voting_rules.json
+       config/decrees_of_the_six/economy_config.json
 
 5. Use `/decrees reload` and `/economy reload` in-game (as an op) after editing configs, or restart the server.
+
+Guild and economy data stores (accounts, transactions, guilds) are managed automatically by the mod and saved on server shutdown. They should not be edited by hand.
 
 ---
 
@@ -79,20 +127,18 @@ Defines global flags, the council name, ceremony sound, and council seats.
 
 Example:
 
-~~~json
-{
-  "councilName": "Hexarchate of Salmon",
-  "decreesEnabled": true,
-  "opsOnly": false,
-  "ceremonySound": "decrees_of_the_six:council_chime",
-  "seats": [
     {
-      "id": "overseer_regent",
-      "displayName": "Overseer-Regent"
+      "councilName": "Hexarchate of Salmon",
+      "decreesEnabled": true,
+      "opsOnly": false,
+      "ceremonySound": "decrees_of_the_six:council_chime",
+      "seats": [
+        {
+          "id": "overseer_regent",
+          "displayName": "Overseer-Regent"
+        }
+      ]
     }
-  ]
-}
-~~~
 
 **Fields:**
 
@@ -121,7 +167,7 @@ Example:
 
 You typically assign seat holders in-game using `/decrees seat set` instead of editing `holderUuid` by hand.
 
-> **Note:** `/decrees council create <name>` will:
+> `/decrees council create <name>` will:
 > - Set `councilName` to `<name>`,
 > - Force `decreesEnabled = true`,
 > - Force `opsOnly = false`.
@@ -134,14 +180,12 @@ Controls how votes are evaluated.
 
 Example:
 
-~~~json
-{
-  "minQuorumPercent": 60,
-  "votingDurationMinutes": 30,
-  "majorityMode": "SIMPLE",
-  "tiesPass": false
-}
-~~~
+    {
+      "minQuorumPercent": 60,
+      "votingDurationMinutes": 30,
+      "majorityMode": "SIMPLE",
+      "tiesPass": false
+    }
 
 **Fields:**
 
@@ -167,9 +211,7 @@ Example:
 
 Finalised decrees (status becomes **ENACTED**, **REJECTED**, or **CANCELLED**) are appended to a history log, e.g.:
 
-~~~text
-config/decrees_of_the_six/decrees_history.log
-~~~
+    config/decrees_of_the_six/decrees_history.log
 
 The log typically includes:
 
@@ -189,17 +231,15 @@ Controls how the currency behaves and how amounts are displayed.
 
 Example:
 
-~~~json
-{
-  "enabled": true,
-  "currencyName": "Scales",
-  "goldName": "Gold",
-  "silverName": "Silver",
-  "copperName": "Copper",
-  "copperPerSilver": 10,
-  "copperPerGold": 100
-}
-~~~
+    {
+      "enabled": true,
+      "currencyName": "Scales",
+      "goldName": "Gold",
+      "silverName": "Silver",
+      "copperName": "Copper",
+      "copperPerSilver": 10,
+      "copperPerGold": 100
+    }
 
 **Fields (high level):**
 
@@ -217,7 +257,7 @@ Example:
   - Conversion rates to the smallest unit (copper).  
   - Example above → `1 Silver = 10 Copper`, `1 Gold = 100 Copper`.
 
-Economy data (accounts + transactions) is stored in a separate JSON file (e.g. `economy_store.json`) next to your other Decrees config. It is not meant to be edited by hand.
+Economy data (accounts + transactions + guild Treasuries) is stored in a separate JSON file (e.g. `economy_store.json`) next to your other Decrees config. It is not meant to be edited by hand.
 
 ---
 
@@ -256,29 +296,23 @@ All seat management commands are op-only:
 Typical flow for a council session:
 
 1. **Create a decree (DRAFT)**  
-   A council member runs:  
+   A council member runs:
 
-   ~~~text
-   /decrees decree create <title>
-   ~~~  
+       /decrees decree create <title>
 
    This creates a new decree in **DRAFT** status, linked to their seat.
 
 2. **Edit details (optional but recommended)**  
 
-   ~~~text
-   /decrees decree edit title <id> <new_title>
-   /decrees decree edit description <id> <text>
-   /decrees decree edit category <id> <category>
-   /decrees decree edit expiry <id> none
-   /decrees decree edit expiry <id> <days>
-   ~~~  
+       /decrees decree edit title <id> <new_title>
+       /decrees decree edit description <id> <text>
+       /decrees decree edit category <id> <category>
+       /decrees decree edit expiry <id> none
+       /decrees decree edit expiry <id> <days>
 
 3. **Open for voting (VOTING)**  
 
-   ~~~text
-   /decrees decree open <id>
-   ~~~  
+       /decrees decree open <id>
 
    - Starts the voting timer (`votingDurationMinutes`) if configured.  
    - Notifies council members, including clickable `[Yes] [No] [Abstain]` buttons in chat.
@@ -286,11 +320,9 @@ Typical flow for a council session:
 4. **Council votes**  
    Each council seat holder uses:
 
-   ~~~text
-   /decrees vote <id> yes
-   /decrees vote <id> no
-   /decrees vote <id> abstain
-   ~~~  
+       /decrees vote <id> yes
+       /decrees vote <id> no
+       /decrees vote <id> abstain
 
    or clicks the vote buttons to prefill the vote command.
 
@@ -471,10 +503,10 @@ Use this once per season when the council is founded, or again if you want to ce
   Remove money from a player.
 
 - `/moneyadmin treasury deposit <amount>`  
-  Move money from the executor to the Treasury.
+  Move money from the executor to the global Treasury.
 
 - `/moneyadmin treasury withdraw <amount>`  
-  Move money from the Treasury to the executor.
+  Move money from the global Treasury to the executor.
 
 - `/moneyadmin log`  
   Show recent transactions across the whole system (for audit).
@@ -486,6 +518,76 @@ Use this once per season when the council is founded, or again if you want to ce
 
 - `/economy reload` (op only)  
   Reload `economy_config.json` from disk.
+
+---
+
+### 7. Guilds & Vox Imperion
+
+**Player guild commands:**
+
+- `/guild create <name>`  
+  Create a new guild (one guild per player).  
+  You become the **Leader** and a guild Treasury account is created.
+
+- `/guild invite <player>`  
+- `/guild accept`  
+- `/guild deny`  
+  Invite other players to your guild and let them accept or deny.
+
+- `/guild leave`  
+  Leave your current guild.  
+  - Leaders must transfer leadership or disband instead of leaving.
+
+- `/guild kick <player>`  
+  Remove a player from the guild.  
+  - Leader and Officers may kick lower-rank members according to rank rules.
+
+- `/guild promote <player>`  
+- `/guild demote <player>`  
+  Change a member’s rank within `Leader / Officer / Veteran / Member / Recruit`.  
+  (Leader can adjust all non-leader ranks; Officers can adjust Veteran/Member/Recruit.)
+
+- `/guild setmotd <text>`  
+  Set a guild description / MOTD for info screens.
+
+- `/guild setopen <true|false>`  
+  Mark the guild as open or closed for future open-join features (stored now, used later).
+
+- `/guild setmax <number>`  
+  Optional member cap (stored now, used later).
+
+- `/guild settitle <leader|officer|veteran|member|recruit> <title>`  
+  Set guild-specific display titles for ranks (e.g. `"High Chancellor"`, `"First Blade"`).
+
+- `/guild balance`  
+  Show the guild Treasury balance in G/S/C.
+
+- `/guild deposit <G> <S> <C>`  
+  Deposit money from your personal account into the guild Treasury.
+
+- `/guild withdraw <G> <S> <C>`  
+  **Leader-only**: withdraw money from the guild Treasury to your personal account.
+
+**Admin / Vox Imperion commands:**
+
+- `/vox guild info <name>`  
+  Inspect any guild:
+  - Leader,
+  - Member counts by rank,
+  - Treasury balance,
+  - Creation date (if tracked).
+
+- `/vox guild setleader <guild> <player>`  
+  Force-transfer leadership to another player.
+
+- `/vox guild disband <guild>`  
+  Force disband a guild.  
+  Remaining guild funds are redirected to the Council Treasury (configurable pattern in code).
+
+- `/vox guild rename <guild> <newName>`  
+  Emergency rename for trolling / violations.
+
+Vox commands are bound to the **Vox Imperion** council seat via the council permission system (with an op fallback).
 
 ---
 
@@ -501,6 +603,7 @@ Use this once per season when the council is founded, or again if you want to ce
   - `/decrees config ...`
   - `/economy reload`
   - All `/moneyadmin ...` commands
+  - All `/vox guild ...` commands
 - When `opsOnly = true`, ops can also create/open/delete/vote on decrees even without a seat.
 
 **Council members** (players who hold a seat):
@@ -509,28 +612,36 @@ Use this once per season when the council is founded, or again if you want to ce
   (assuming `decreesEnabled = true` and `opsOnly = false`).
 - Can vote on any decree in **VOTING**.
 
+**Guild members:**
+
+- May use `/guild` commands according to their rank:
+  - Everyone: `/guild balance`, `/guild deposit`, `/guild leave`, basic info.
+  - Veterans/Officers: extra invite powers.
+  - Leader: full management + `/guild withdraw`.
+
 **Regular players:**
 
 - Can typically view decree lists and info (if you keep those commands open).
-- Can use `/money`, `/money balance`, `/money pay`, and `/money log` if the economy is enabled.
-- Cannot create, open, delete, or vote unless:
+- Can use `/money`, `/money balance`, `/money pay`, `/money log` if the economy is enabled.
+- Can create and join guilds via `/guild` commands (subject to your server rules).
+- Cannot create, open, delete, or vote on decrees unless:
   - they are given a seat, or
   - you switch to `opsOnly` and make them ops (not recommended).
 
-> **Note:** If `decreesEnabled` is `false`, mutating decree commands are blocked even for ops  
+> If `decreesEnabled` is `false`, mutating decree commands are blocked even for ops  
 > (except `/decrees reload` and `/decrees decree force`).  
-> If `economy_config.enabled` is `false`, all money commands will refuse to run.
+> If `economy_config.enabled` is `false`, all money and guild Treasury commands will refuse to run.
 
 ---
 
 ## Versioning & Changelog
 
 This mod uses **semantic versioning**.  
-See [`CHANGELOG.md`](CHANGELOG.md) for a detailed list of changes per version.
+See `CHANGELOG.md` for a detailed list of changes per version.
 
 ---
 
 ## License
 
 Decrees of the Six is licensed under the **MIT License**.  
-See [`LICENSE`](LICENSE) for full details.
+See `LICENSE` for full details.

@@ -6,6 +6,72 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v0.2.1] – Guilds, Treasury & Hexarchate Panel
+
+### New: Player Guilds (Phase 2 foundations)
+- Added fully persistent **Guilds** as first-class entities:
+  - Unique guild ID, name, leader, members and 5 ranks: `Leader / Officer / Veteran / Member / Recruit`.
+  - Each guild has its own **Treasury account** in the economy system.
+- Core guild commands:
+  - `/guild create <name>` – found a new guild (one guild per player).
+  - `/guild invite <player>` / `/guild accept` / `/guild deny` – invite-based join flow.
+  - `/guild leave` – members can leave; leaders must transfer or disband.
+  - `/guild kick <player>` – Leader and Officers can remove lower-rank members.
+  - `/guild promote <player>` / `/guild demote <player>` – rank management within the 5-step ladder.
+- Guild settings & flavour:
+  - `/guild setmotd <text>` – set a guild description / MOTD.
+  - `/guild setopen <true|false>` – prepare for future open-join behaviour.
+  - `/guild setmax <number>` – optional member cap (stored now, enforced later).
+  - `/guild settitle <leader|officer|veteran|member|recruit> <title>` – **per-guild custom rank titles** (e.g. “Archon”, “First Blade”, etc.).
+
+### New: Guild Treasury + Economy Integration
+- Every guild now has a dedicated **SYSTEM Treasury account** created at guild creation.
+- Economy-backed commands:
+  - `/guild balance` – shows the guild Treasury balance (Gold / Silver / Copper).
+  - `/guild deposit <G> <S> <C>` – transfer from your personal account into the guild Treasury.
+  - `/guild withdraw <G> <S> <C>` – **Leader-only** withdrawal from Treasury back to their personal account.
+- All guild money flows use the existing Phase 1 economy backend (`EconomyStore`, `EconomyService`, `TransactionType`).
+
+### New: Vox Imperion Guild Tools
+- The **Vox Imperion** council seat (or server ops) gains admin-side guild controls:
+  - `/vox guild info <name>` – inspect any guild: leader, member breakdown, and Treasury balance.
+  - `/vox guild setleader <guild> <player>` – force-transfer guild leadership.
+  - `/vox guild disband <guild>` – forcibly disband a guild; remaining funds are redirected to the **Council Treasury**.
+  - `/vox guild rename <guild> <newName>` – emergency rename for trolling / violations.
+- Vox commands are bound to the **Vox Imperion** seat via the existing council permission system (plus fallback for ops).
+
+### New: Hexarchate Panel – Guild Tab (G-key UI)
+- The in-game **Hexarchate Panel** (opened with the G key) now has **two tabs**:
+  - **Ledger** – existing player economy overview.
+  - **Guild** – new tab for guild status.
+- Guild tab displays:
+  - Guild name and **your custom rank title**.
+  - Leader name (resolved from UUID when possible).
+  - Member counts by rank: total members + Officers / Veterans / Members / Recruits.
+  - Guild Treasury balance formatted as G/S/C.
+  - Pending invite count if you are not yet in a guild.
+- Guild tab actions:
+  - **Deposit** – opens chat prefilled with `/guild deposit ` to send funds to the Treasury.
+  - **Leave Guild** – sends `/guild leave` for quick exit.
+  - **Invites** – shows `Invites (X)` when you have pending invites and opens chat with `/guild accept`.
+
+### Networking & Persistence
+- Added guild snapshot networking for the UI:
+  - `GuildSnapshotRequestC2SPayload` (client → server) requests a fresh guild snapshot.
+  - `GuildSnapshotS2CPayload` (server → client) sends a compact summary of the player’s guild + Treasury.
+  - `GuildNetworking` (server) and `GuildClientNetworking` + `ClientGuildState` (client) mirror the existing economy snapshot pattern.
+- `GuildStore` is loaded on server start and saved on clean shutdown alongside `EconomyStore`, ensuring guilds and their treasuries persist between restarts.
+- Ensured a player can effectively be **in only one guild at a time**; helper logic keeps membership maps and the player→guild mapping consistent, even under Vox overrides.
+
+### Notes / Limitations (by design for 0.2.1)
+- No weekly dues, taxes, or faction politics yet – this release is focused on **solid foundations**:
+  - guild identity + ranks,
+  - shared money via Treasury,
+  - clean admin controls (Vox Imperion),
+  - and a first UI surface for players.
+- Open-join behaviour (`openJoin`) and more advanced guild management / Vox-only UI hooks are reserved for future milestones.
+
+
 ## [0.2.0] – Economy Foundations (Phase 1)
 
 ### New – Core Currency & Accounts

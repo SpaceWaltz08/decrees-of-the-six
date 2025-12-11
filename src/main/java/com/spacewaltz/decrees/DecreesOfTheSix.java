@@ -16,6 +16,9 @@ import com.spacewaltz.decrees.economy.EconomyConfig;
 import com.spacewaltz.decrees.economy.EconomyNetworking;
 import com.spacewaltz.decrees.economy.EconomyService;
 import com.spacewaltz.decrees.economy.EconomyStore;
+import com.spacewaltz.decrees.guilds.GuildCommands;
+import com.spacewaltz.decrees.guilds.GuildNetworking;
+import com.spacewaltz.decrees.guilds.GuildStore;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -62,19 +65,30 @@ public class DecreesOfTheSix implements ModInitializer {
         DecreeStore.load();        // decrees.json
         DecreeHistoryLogger.init(); // decree_history.json (season history)
 
+        // ---- Guild data ----
+        GuildStore.load();         // guilds.json (guilds + membership)
+
         // ---- Command registration ----
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             CouncilCommands.register(dispatcher);       // /decrees ...
             DecreeHistoryCommand.register(dispatcher);  // /decrees history
+
             // Player-facing /money
             EconomyCommands.registerMoneyCommands(dispatcher);
 
             // Admin-facing /economy and legacy alias /moneyadmin
             EconomyCommands.registerMoneyAdminCommands(dispatcher);
+
+            // Guilds
+            GuildCommands.register(dispatcher);
+            GuildCommands.registerVoxGuildCommands(dispatcher);
         });
 
         // Register server-side economy networking (G-key UI snapshot)
         EconomyNetworking.init();
+
+        // Register server-side guild networking (G-key UI snapshot)
+        GuildNetworking.init();
 
         // ---- Auto-close expired decrees on server tick ----
         ServerTickEvents.END_SERVER_TICK.register(server ->
@@ -126,8 +140,11 @@ public class DecreesOfTheSix implements ModInitializer {
             );
         });
 
-        // ---- Save economy store on clean shutdown ----
-        ServerLifecycleEvents.SERVER_STOPPING.register(server -> EconomyStore.save());
+        // ---- Save stores on clean shutdown ----
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+            EconomyStore.save();
+            GuildStore.save();
+        });
 
 
         LOGGER.info("Decrees of the Six initialized.");

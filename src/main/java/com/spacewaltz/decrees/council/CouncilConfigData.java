@@ -30,6 +30,18 @@ public class CouncilConfigData {
     /** Sound event ID used for the council ceremony chime. */
     public String ceremonySound = "decrees_of_the_six:council_chime";
 
+    /**
+     * Seat ID that holds economy admin powers.
+     * Default assumes the Exarch of the Ledger seat id is "ledger_exarch".
+     */
+    public String economyAdminSeatId = "ledger_exarch";
+
+    /**
+     * Seat ID that holds guilds / factions admin powers.
+     * Default assumes a Vox Imperion-like seat id is "vox_imperion".
+     */
+    public String guildsAdminSeatId = "vox_imperion";
+
     /** Declared council seats. */
     public List<SeatDefinition> seats = new ArrayList<>();
 }

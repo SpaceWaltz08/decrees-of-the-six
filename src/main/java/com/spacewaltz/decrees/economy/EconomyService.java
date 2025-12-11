@@ -61,6 +61,44 @@ public final class EconomyService {
         return treasury;
     }
 
+    /**
+     * Creates a non-player SYSTEM account, used for things like guild treasuries.
+     *
+     * @param ownerId logical owner identifier, e.g. "GUILD:<id>".
+     */
+    public static EconomyAccount createSystemAccount(String ownerId) {
+        if (ownerId == null || ownerId.isBlank()) {
+            DecreesOfTheSix.LOGGER.warn("Attempted to create system account with empty ownerId.");
+            return null;
+        }
+
+        EconomyStore store = EconomyStore.get();
+
+        EconomyAccount account = new EconomyAccount();
+        account.id = store.generateAccountId();
+        account.type = AccountType.SYSTEM;
+        account.ownerId = ownerId;
+        account.balanceCopper = 0;
+
+        store.accounts.put(account.id, account);
+        EconomyStore.save();
+
+        return account;
+    }
+
+    /**
+     * Looks up any account by its id.
+     *
+     * @return the account, or null if not found.
+     */
+    public static EconomyAccount getAccountById(String accountId) {
+        if (accountId == null || accountId.isBlank()) {
+            return null;
+        }
+        EconomyStore store = EconomyStore.get();
+        return store.accounts.get(accountId);
+    }
+
     public static int getBalanceCopper(EconomyAccount account) {
         return account != null ? account.balanceCopper : 0;
     }

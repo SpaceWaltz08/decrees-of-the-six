@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.spacewaltz.decrees.council.Messenger;
+import com.spacewaltz.decrees.council.CouncilPortfolios;
 import net.minecraft.command.argument.GameProfileArgumentType;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
@@ -82,7 +83,10 @@ public final class EconomyCommands {
         // Root admin tree under /economy
         LiteralCommandNode<ServerCommandSource> economyNode = dispatcher.register(
                 CommandManager.literal("economy")
-                        .requires(src -> src.hasPermissionLevel(3))
+                        .requires(src -> CouncilPortfolios.hasPortfolio(
+                                src,
+                                CouncilPortfolios.Portfolio.ECONOMY_ADMIN
+                        ))
                         // /economy help
                         .then(CommandManager.literal("help")
                                 .executes(ctx -> showAdminHelp(ctx.getSource())))
@@ -141,7 +145,10 @@ public final class EconomyCommands {
         // Legacy admin alias: /moneyadmin -> /economy
         dispatcher.register(
                 CommandManager.literal("moneyadmin")
-                        .requires(src -> src.hasPermissionLevel(3))
+                        .requires(src -> CouncilPortfolios.hasPortfolio(
+                                src,
+                                CouncilPortfolios.Portfolio.ECONOMY_ADMIN
+                        ))
                         .redirect(economyNode)
         );
     }
@@ -400,9 +407,11 @@ public final class EconomyCommands {
     }
 
     private static int reloadEconomy(ServerCommandSource src) {
-        MinecraftServer server = src.getServer();
-        if (server == null) {
-            Messenger.error(src, "Server not available.");
+        if (!CouncilPortfolios.ensurePortfolio(
+                src,
+                CouncilPortfolios.Portfolio.ECONOMY_ADMIN,
+                "reload the economy configuration"
+        )) {
             return 0;
         }
 

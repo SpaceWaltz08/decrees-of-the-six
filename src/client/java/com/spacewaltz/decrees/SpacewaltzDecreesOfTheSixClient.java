@@ -2,6 +2,8 @@ package com.spacewaltz.decrees;
 
 import com.spacewaltz.decrees.client.economy.ClientEconomyState;
 import com.spacewaltz.decrees.client.economy.EconomyClientNetworking;
+import com.spacewaltz.decrees.client.guild.ClientGuildState;
+import com.spacewaltz.decrees.client.guild.GuildClientNetworking;
 import com.spacewaltz.decrees.client.ui.HexarchateMainScreen;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -19,6 +21,8 @@ public class SpacewaltzDecreesOfTheSixClient implements ClientModInitializer {
     public void onInitializeClient() {
         // Register S2C handlers for the economy packets
         EconomyClientNetworking.init();
+
+        GuildClientNetworking.init();
 
         // G keybinding
         OPEN_PANEL_KEY = KeyBindingHelper.registerKeyBinding(
@@ -42,8 +46,9 @@ public class SpacewaltzDecreesOfTheSixClient implements ClientModInitializer {
             return;
         }
 
-        // Request fresh snapshot from the server
+        // Request fresh snapshots from the server
         ClientEconomyState.requestSnapshot();
+        ClientGuildState.requestSnapshot();
 
         client.setScreen(new HexarchateMainScreen());
     }
